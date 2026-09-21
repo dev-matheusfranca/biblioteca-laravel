@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class Locacao extends Model
 {
@@ -17,7 +18,7 @@ class Locacao extends Model
         'data_locacao',
         'data_devolucao',
         'data_devolvido',
-        'status'
+        'status',
     ];
 
     public function usuario()
@@ -28,5 +29,14 @@ class Locacao extends Model
     public function livro()
     {
         return $this->belongsTo(Livro::class, 'livro_id');
+    }
+
+    public function getSituacaoAtualAttribute(): string
+    {
+        if ($this->status !== 'devolvida' && Carbon::parse($this->data_devolucao)->isBefore(today())) {
+            return 'atrasada';
+        }
+
+        return $this->status;
     }
 }

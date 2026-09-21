@@ -1,18 +1,9 @@
 @extends('layouts.app')
-@section('title','Criar Autor')
-@section('content')
 
-<h2>Criar Autor</h2>
-<form action="{{ route('autores.store') }}" method="POST">
-    @csrf
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        <input type="text" name="nome" class="form-control" required>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Nacionalidade</label>
-        <input type="text" name="nacionalidade" class="form-control">
-    </div>
-    <button class="btn btn-primary">Salvar</button>
-</form>
+@section('title', 'Cadastrar autor')
+
+@section('content')
+    <a href="{{ route('autores.index') }}" class="back-link">← Voltar aos autores</a>
+    <header class="page-heading"><div><div class="eyebrow">Catálogo</div><h1>Cadastrar autor</h1><p>Registre a autoria antes de incluir novos títulos no acervo.</p></div></header>
+    <section class="panel form-panel"><form action="{{ route('autores.store') }}" method="POST">@csrf @include('autores._form', ['autor' => null, 'submitLabel' => 'Cadastrar autor'])</form></section>
 @endsection

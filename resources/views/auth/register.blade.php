@@ -1,30 +1,45 @@
 @extends('layouts.app')
-@section('title','Registrar')
+@section('title', 'Criar conta')
 @section('content')
-
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <h2>Registrar</h2>
+<div class="auth-layout">
+    <section class="auth-intro">
+        <span class="eyebrow">UM ESPAÇO PARA COMPARTILHAR</span>
+        <h1>Boas histórias<br>começam aqui.</h1>
+        <p>Crie sua conta para acessar a biblioteca e participar da organização do acervo.</p>
+        <div class="auth-benefits">
+            <div class="auth-benefit">@include('partials.icon', ['name' => 'book']) Livros, autores e categorias organizados</div>
+            <div class="auth-benefit">@include('partials.icon', ['name' => 'arrows']) Um histórico para cada leitura</div>
+            <div class="auth-benefit">@include('partials.icon', ['name' => 'check']) Disponibilidade para decidir com clareza</div>
+        </div>
+    </section>
+    <section class="auth-card" aria-labelledby="register-title">
+        <h2 id="register-title">Criar sua conta</h2>
+        <p>Preencha os campos abaixo para começar.</p>
         <form method="POST" action="{{ route('register.post') }}">
-        @csrf
-        <div class="mb-3">
-            <label class="form-label">Nome</label>
-            <input type="text" name="nome" class="form-control" value="{{ old('nome') }}" required>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">E-mail</label>
-            <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Senha</label>
-            <input type="password" name="password" class="form-control" required>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Confirmar senha</label>
-            <input type="password" name="password_confirmation" class="form-control" required>
-        </div>
-        <button class="btn btn-primary">Registrar</button>
+            @csrf
+            <div class="field">
+                <label for="nome">Nome</label>
+                <input id="nome" type="text" name="nome" class="form-control" value="{{ old('nome') }}" placeholder="Como podemos chamar você?" autocomplete="name" maxlength="255" required @error('nome') aria-invalid="true" aria-describedby="nome-error" @enderror>
+                @error('nome')<span id="nome-error" class="field-error">{{ $message }}</span>@enderror
+            </div>
+            <div class="field">
+                <label for="email">E-mail</label>
+                <input id="email" type="email" name="email" class="form-control" value="{{ old('email') }}" placeholder="seu@email.com" autocomplete="email" maxlength="255" required @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
+                @error('email')<span id="email-error" class="field-error">{{ $message }}</span>@enderror
+            </div>
+            <div class="field">
+                <label for="password">Senha</label>
+                <input id="password" type="password" name="password" class="form-control" autocomplete="new-password" minlength="6" required aria-describedby="password-hint @error('password') password-error @enderror" @error('password') aria-invalid="true" @enderror>
+                <p class="password-hint" id="password-hint">Use pelo menos 6 caracteres.</p>
+                @error('password')<span id="password-error" class="field-error">{{ $message }}</span>@enderror
+            </div>
+            <div class="field">
+                <label for="password_confirmation">Confirmar senha</label>
+                <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" autocomplete="new-password" minlength="6" required>
+            </div>
+            <button class="btn btn-primary" type="submit">Criar conta @include('partials.icon', ['name' => 'arrow'])</button>
         </form>
-    </div>
+        <p class="auth-switch">Já tem uma conta? <a href="{{ route('login') }}">Entrar</a></p>
+    </section>
 </div>
 @endsection

@@ -19,4 +19,21 @@ class RegisterRequest extends FormRequest
             'password' => ['required', 'string', 'confirmed', 'min:6'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'required' => 'O campo :attribute é obrigatório.',
+            'email' => 'Informe um e-mail válido.',
+            'unique' => 'Este e-mail já está cadastrado.',
+            'confirmed' => 'A confirmação da senha não confere.',
+            'min' => 'A senha deve ter pelo menos :min caracteres.',
+            'max' => 'O campo :attribute não pode ter mais de :max caracteres.',
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return ['nome' => 'nome', 'email' => 'e-mail', 'password' => 'senha'];
+    }
 }

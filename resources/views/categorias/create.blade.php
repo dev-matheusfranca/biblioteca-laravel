@@ -1,18 +1,9 @@
 @extends('layouts.app')
-@section('title','Criar Categoria')
-@section('content')
 
-<h2>Criar Categoria</h2>
-<form action="{{ route('categorias.store') }}" method="POST">
-    @csrf
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        <input type="text" name="nome" class="form-control" required>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Descrição</label>
-        <textarea name="descricao" class="form-control"></textarea>
-    </div>
-    <button class="btn btn-primary">Salvar</button>
-</form>
+@section('title', 'Cadastrar categoria')
+
+@section('content')
+    <a href="{{ route('categorias.index') }}" class="back-link">← Voltar às categorias</a>
+    <header class="page-heading"><div><div class="eyebrow">Catálogo</div><h1>Cadastrar categoria</h1><p>Defina uma classificação clara para facilitar a descoberta de livros.</p></div></header>
+    <section class="panel form-panel"><form action="{{ route('categorias.store') }}" method="POST">@csrf @include('categorias._form', ['categoria' => null, 'submitLabel' => 'Cadastrar categoria'])</form></section>
 @endsection

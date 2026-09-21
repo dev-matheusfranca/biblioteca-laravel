@@ -19,4 +19,23 @@ class StoreLocacaoRequest extends FormRequest
             'data_devolucao' => ['required', 'date', 'after:today'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'required' => 'O campo :attribute é obrigatório.',
+            'exists' => 'Selecione um :attribute válido.',
+            'date' => 'Informe uma data de devolução válida.',
+            'after' => 'A data prevista de devolução deve ser posterior a hoje.',
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'usuario_id' => 'usuário',
+            'livro_id' => 'livro',
+            'data_devolucao' => 'data prevista de devolução',
+        ];
+    }
 }

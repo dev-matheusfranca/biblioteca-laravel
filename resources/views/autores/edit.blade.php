@@ -1,18 +1,9 @@
 @extends('layouts.app')
-@section('title','Editar Autor')
-@section('content')
 
-<h2>Editar Autor</h2>
-<form action="{{ route('autores.update', $autor->id) }}" method="POST">
-    @csrf @method('PUT')
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        <input type="text" name="nome" class="form-control" value="{{ $autor->nome }}" required>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Nacionalidade</label>
-        <input type="text" name="nacionalidade" class="form-control" value="{{ $autor->nacionalidade }}">
-    </div>
-    <button class="btn btn-primary">Atualizar</button>
-</form>
+@section('title', 'Editar autor')
+
+@section('content')
+    <a href="{{ route('autores.show', $autor) }}" class="back-link">← Voltar aos detalhes</a>
+    <header class="page-heading"><div><div class="eyebrow">Catálogo</div><h1>Editar autor</h1><p>Atualize os dados de <strong>{{ $autor->nome }}</strong>.</p></div></header>
+    <section class="panel form-panel"><form action="{{ route('autores.update', $autor) }}" method="POST">@csrf @method('PUT') @include('autores._form', ['autor' => $autor, 'submitLabel' => 'Salvar alterações'])</form></section>
 @endsection
