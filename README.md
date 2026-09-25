@@ -1,81 +1,48 @@
-# Biblioteca
+# Biblioteca Laravel
 
-Aplicação Laravel para gerir um acervo e a circulação de livros. Ela dá a uma equipe um único lugar para cadastrar autores, categorias e títulos, acompanhar exemplares disponíveis e registrar empréstimos e devoluções.
+Aplicação de biblioteca para portfólio, construída como um monólito Laravel: a equipe administra acervo e circulação, enquanto leitores usam o próprio portal. O projeto prioriza regras de negócio verificáveis, inventário físico, acesso por papéis, concorrência no banco e operação local reproduzível.
 
-## O que o sistema faz
+**Situação atual:** as fases F2–F7 foram concluídas e validadas para uma demonstração Docker local. A F7 comprovou imagem PHP 8.4/Apache, Compose separado, cenário fictício, recuperação, rollback, deploy C, backup verificado e restauração lateral. O projeto não declara publicação em nuvem ou operação externa.
 
-- Mantém autores e categorias que organizam o acervo.
-- Cadastra livros com ISBN opcional, quantidade total, quantidade disponível e situação de cadastro (`ativo` ou `inativo`).
-- Registra empréstimos para uma pessoa com data prevista de devolução e impede um novo empréstimo aberto do mesmo livro para a mesma pessoa.
-- Registra devoluções de forma idempotente, devolvendo um exemplar ao estoque uma única vez.
-- Calcula a situação atrasada a partir da data prevista; não depende de uma atualização manual de status.
-- Protege o histórico: autores, categorias e livros que possuem dependências não são removidos; empréstimos não têm rota de exclusão.
-- Oferece filtros por texto, categoria, disponibilidade e situação, com paginação que conserva a consulta.
+## Capacidades demonstradas
 
-A página inicial mostra apenas títulos ativos para visitantes; contas autenticadas também veem o panorama operacional e títulos inativos. As telas de gestão exigem autenticação. No estado atual, qualquer conta registrada pode administrar o acervo; papéis distintos de equipe e leitor precisam ser definidos antes de uma publicação aberta.
+- Acervo com autores, categorias, títulos e exemplares físicos identificados; reconciliação explícita antes de novas retiradas.
+- Empréstimos, devoluções, perdas, atrasos, reservas FIFO, holds e renovação sob política versionada.
+- Portal de leitor, gestão por bibliotecários e administração de equipe; autorização é aplicada no servidor.
+- Comunicações por outbox durável, Redis e Horizon, com avisos no portal e caixa Mailpit local.
+- Busca ISBN limitada e com fallback manual, API autenticada para fluxos do leitor e relatórios com CSV seguro.
+- Catálogo público cacheado em Redis dedicado, fallback ao banco e painel de saúde com telemetria agregada.
 
-## Experiência e interface
+## Como explorar
 
-A interface usa Blade e arquivos locais em `public/css/biblioteca.css` e `public/js/biblioteca.js`: não depende de CDN e não exige build do front-end em tempo de execução. A direção visual combina navegação azul-noite, acentos lilás e ilustração de estante, com formulários, filtros, estados vazios, alertas e tabelas responsivas. Inclui menu móvel, link para pular ao conteúdo, foco visível e confirmação antes de ações destrutivas ou operacionais.
+O [guia de desenvolvimento](docs/desenvolvimento.md) contém o início do ambiente Docker isolado, provisionamento do primeiro administrador, operações de fila e os limites do runtime local. Ele também registra as portas de desenvolvimento, que ficam expostas apenas em loopback.
 
-Os menus de seleção usam Tom Select 2.6.2 (build base) e o calendário usa Flatpickr 4.6.13, em português. As adaptações visuais e de formulário ficam em `public/css/{select,date}-picker.css` e `public/js/{select,date}-picker.js`. Os componentes preservam os campos originais e os valores esperados pelo backend; a data aparece como `dd/mm/aaaa` e é enviada como `aaaa-mm-dd`. Sem JavaScript, os controles nativos continuam disponíveis.
+Para entender o projeto como case técnico, comece por:
 
-As distribuições e licenças estão versionadas em `public/vendor/`. Para reproduzir esses assets após instalar as versões fixadas no lockfile:
+- [Arquitetura](docs/arquitetura.md): componentes, fluxos e fronteiras do sistema.
+- [Decisões de arquitetura](docs/decisoes.md): escolhas, consequências e limites conhecidos.
+- [Execução F2–F7](docs/execucao-f2-f7.md): evidências por fase, incluindo testes, corridas MySQL e smoke de navegador.
+- [Demonstração](docs/demonstracao.md) e [operação local](docs/deploy-local.md): roteiro, dados fictícios, backup, restauração e rollback da F7.
+- [API](docs/api.md), [integração ISBN](docs/integracao-isbn.md), [relatórios](docs/relatorios.md) e [observabilidade](docs/observabilidade.md): contratos das superfícies especializadas.
+- [Plano de evolução](docs/plano-evolucao.md): histórico e sequência de evolução do projeto.
 
-```powershell
-npm ci --ignore-scripts
-npm run vendor:sync
-```
+## Qualidade e evidências
 
-Node é necessário apenas para essa sincronização, não para servir as telas.
+A F6 registrou 141 testes e 887 asserções em SQLite, além de 152 testes e 958 asserções em MySQL. A F7 concluiu o deploy local da imagem C, cenário por seeder, jornadas de renovação, FIFO, comunicação, relatórios e permissões, recuperação automática, rollback, backup e restauração lateral autenticada. A restauração preservou 5 usuários, 14 títulos, 30 exemplares, 5 locações e 3 reservas, sem locações abertas inválidas. Foram incluídas corridas reais de concorrência com processos MySQL separados, checagens estáticas e smoke responsivo de telas de gestão, portal e relatórios. As evidências e seus limites estão em [docs/execucao-f2-f7.md](docs/execucao-f2-f7.md).
 
-## Requisitos
+Essa validação não é um teste de carga, certificação de entrega SMTP externa, publicação em nuvem ou garantia de escala. Mailpit representa a caixa de correio local; métricas operacionais são amostradas e não substituem auditoria completa.
 
-- PHP 8.2 ou superior
-- Composer
-- Banco de dados configurado no `.env` (ou SQLite para desenvolvimento/testes)
+## Limites assumidos
 
-O projeto usa Laravel 12 e PHPUnit. Os pacotes de Vite/Tailwind constam do repositório-base, mas as telas entregues carregam os assets locais diretamente.
+- Uma única biblioteca: não há multiempresa nem isolamento por organização.
+- A demonstração F7 é local em Docker, em serviços e volumes separados do desenvolvimento; não há HTTPS público, provedor cloud ou RabbitMQ declarados.
+- O envio de e-mail usa uma outbox para preservar a intenção, mas SMTP não oferece garantia de entrega exatamente uma vez.
+- O catálogo pode servir resultado em cache até a invalidação/TTL; em falha do cache, consulta o banco.
+- ISBN é uma sugestão de edição da Open Library: o operador continua responsável pela confirmação e pelo cadastro manual.
+- Os resultados das execuções remotas estão no [GitHub Actions](https://github.com/dev-matheusfranca/biblioteca-laravel/actions/workflows/quality.yml). O ganho de p95 no benchmark local foi 14,73% (352,33 ms para 300,44 ms), abaixo da meta exploratória de 20% (281,86 ms), sem constituir promessa de escala ou SLA.
 
-## Execução local
+## Desenvolvimento
 
-1. Instale as dependências, caso `vendor/` ainda não exista:
+O projeto requer PHP 8.4, Composer, Node e Docker Desktop com engine Linux/WSL2 para o ambiente recomendado. A documentação explica como criar segredos locais ignorados pelo Git e como iniciar aplicação, banco, worker e scheduler na ordem correta. Não use arquivos de ambiente, bases ou credenciais reais como dados de demonstração.
 
-   ```powershell
-   composer install
-   ```
-
-2. Crie o arquivo de ambiente somente se ele ainda não existir e configure a conexão de banco:
-
-   ```powershell
-   if (-not (Test-Path .env)) {
-       Copy-Item .env.example .env
-       php artisan key:generate
-   }
-   ```
-
-3. Em um banco novo, aplique as migrations explicitamente:
-
-   ```powershell
-   php artisan migrate
-   ```
-
-   Não execute `composer setup` sem revisar o ambiente: esse script inclui migration e instalação/build de dependências front-end.
-
-4. Inicie a aplicação:
-
-   ```powershell
-   php artisan serve
-   ```
-
-   Acesse `http://127.0.0.1:8000`.
-
-## Validação
-
-```powershell
-php artisan test
-```
-
-A suíte usa SQLite em memória e cobre cadastro, login, logout, sessões, acesso às telas, catálogo público e autenticado, filtros, estoque, livro ativo/inativo, empréstimos, atraso derivado, devolução idempotente e preservação de histórico. O resultado consolidado desta entrega é **18 testes e 138 assertions**.
-
-Consulte [docs/analise-e-melhorias.md](docs/analise-e-melhorias.md) para a leitura de processo, as melhorias aplicadas e os próximos riscos.
+Para validações locais, consulte os comandos e o escopo de cada suíte no [guia de desenvolvimento](docs/desenvolvimento.md). O projeto inclui verificações de testes, análise estática, estilo PHP e assets, com evidência registrada por fase.

@@ -43,9 +43,14 @@ class CategoriaController extends Controller
 
     public function show(Categoria $categoria)
     {
-        $categoria->load(['livros.autor', 'livros.categoria']);
+        $livros = $categoria->livros()
+            ->with(['autor', 'categoria'])
+            ->orderBy('titulo')
+            ->orderBy('id')
+            ->paginate(10, ['*'], 'livros_page')
+            ->withQueryString();
 
-        return view('categorias.show', compact('categoria'));
+        return view('categorias.show', compact('categoria', 'livros'));
     }
 
     public function edit(Categoria $categoria)

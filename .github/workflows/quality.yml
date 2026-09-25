@@ -1,0 +1,143 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4@sha256:0744ee5ef89ce6ccfa13de3e579fe6b9e27f93dd70da9c06d2c908b1b193fb8d
+        env:
+          MYSQL_DATABASE: biblioteca_testing
+          MYSQL_USER: biblioteca_test
+          MYSQL_PASSWORD: ci-only-isolated-test-password
+          MYSQL_ROOT_PASSWORD: ci-only-isolated-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: biblioteca_testing
+      DB_USERNAME: biblioteca_test
+      DB_PASSWORD: ci-only-isolated-test-password
+      BIBLIOTECA_TEST_DB_HOST: 127.0.0.1
+      BIBLIOTECA_TEST_DB_PASSWORD: ci-only-isolated-test-password
+      BIBLIOTECA_TEST_REDIS_HOST: 127.0.0.1
+      REDIS_HOST: 127.0.0.1
+      REDIS_CLIENT: phpredis
+      CATALOG_CACHE_STORE: array
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, pdo_mysql, redis, pcntl, posix
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: |
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress --no-scripts
+          php artisan package:discover
+          npm ci --ignore-scripts
+      - name: Dependency security
+        run: |
+          composer audit
+          npm audit --audit-level=high
+      - name: Syntax, style, static analysis and local assets
+        run: |
+          git diff --check
+          find app bootstrap config database lang routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+          composer lint
+          composer analyse
+          npm run assets:check
+          for file in public/js/*.js scripts/*.mjs; do node --check "$file"; done
+          npm run build
+      - name: Fast SQLite tests
+        run: composer test
+      - name: MySQL and Redis integration tests
+        run: composer test:mysql
+      - name: Validate container configuration
+        run: |
+          node scripts/init-docker.mjs
+          docker compose --env-file .env.docker config --quiet
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and start isolated application
+        run: |
+          node scripts/init-docker.mjs
+          docker compose --env-file .env.docker up -d --build --wait --wait-timeout 180 app
+          docker compose --env-file .env.docker exec -T app php artisan migrate --force
+          docker compose --env-file .env.docker up -d --wait --wait-timeout 120 worker scheduler
+          curl --fail --silent http://localhost:8088/up > /dev/null
+          curl --fail --silent http://localhost:8088/catalogo > /dev/null
+      - name: Stop services
+        if: always()
+        run: docker compose --env-file .env.docker stop
+
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Release orchestration guards
+        run: python -m unittest discover -s tests/Release -p 'test_*.py'
+      - name: Build production image and validate seeded local release
+        run: |
+          python scripts/demo.py deploy --seed
+          python scripts/demo.py status
+      - name: Verify snapshot and restore with authenticated canary
+        run: |
+          python scripts/demo.py backup
+          python scripts/demo.py restore --archive "$(ls -t __FILES/bd/biblioteca_demo_*.sql.zip | head -1)"
+      - name: Stop demo services
+        if: always()
+        run: |
+          if [ -f .env.demo ]; then
+            DEMO_RELEASE=ci-cleanup docker compose --env-file .env.demo -f compose.demo.yaml stop
+          fi

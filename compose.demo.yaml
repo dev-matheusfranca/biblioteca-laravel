@@ -1,0 +1,128 @@
+name: biblioteca-demo
+
+x-app: &app
+  image: biblioteca-demo-app:${DEMO_RELEASE:?Execute python scripts/demo.py deploy}
+  pull_policy: never
+  dns_opt: ["timeout:1", "attempts:1"]
+  environment: &environment
+    APP_NAME: Biblioteca
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: ${DEMO_APP_KEY:?Inicialize a demonstração}
+    APP_URL: http://localhost:${DEMO_APP_PORT:-8089}
+    APP_LOCALE: pt_BR
+    APP_TIMEZONE: America/Sao_Paulo
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_DATABASE: biblioteca_demo
+    DB_USERNAME: biblioteca_demo
+    DB_PASSWORD: ${DEMO_DB_PASSWORD:?Inicialize a demonstração}
+    DB_URL: ""
+    CACHE_STORE: database
+    CATALOG_CACHE_STORE: catalog
+    REDIS_CATALOG_HOST: redis-cache
+    SESSION_DRIVER: database
+    SESSION_COOKIE: biblioteca_demo_session
+    SESSION_SECURE_COOKIE: "false"
+    SESSION_HTTP_ONLY: "true"
+    SESSION_SAME_SITE: lax
+    QUEUE_CONNECTION: redis
+    REDIS_HOST: redis
+    REDIS_CLIENT: phpredis
+    REDIS_PREFIX: "biblioteca_demo:"
+    REDIS_QUEUE_RETRY_AFTER: "90"
+    HORIZON_PREFIX: "biblioteca_demo_horizon:"
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: info
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: "1025"
+    MAIL_TIMEOUT: "10"
+    MAIL_FROM_ADDRESS: biblioteca@example.test
+    MAIL_FROM_NAME: Biblioteca
+    DEMO_ENABLED: "true"
+  restart: unless-stopped
+  stop_grace_period: 45s
+  volumes:
+    - demo-storage:/var/www/html/storage
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  depends_on:
+    mysql: {condition: service_healthy}
+    redis: {condition: service_healthy}
+    redis-cache: {condition: service_healthy}
+    mailpit: {condition: service_started}
+
+services:
+  app:
+    <<: *app
+    ports: ["127.0.0.1:${DEMO_APP_PORT:-8089}:8080"]
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  worker:
+    <<: *app
+    command: ["php", "artisan", "horizon"]
+    healthcheck:
+      test: ["CMD", "php", "artisan", "horizon:status"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      test: ["CMD", "php", "artisan", "operacoes:saude", "--scheduler-only", "--json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 100s
+      retries: 6
+  mysql:
+    image: mysql:8.4@sha256:0744ee5ef89ce6ccfa13de3e579fe6b9e27f93dd70da9c06d2c908b1b193fb8d
+    environment:
+      MYSQL_DATABASE: biblioteca_demo
+      MYSQL_USER: biblioteca_demo
+      MYSQL_PASSWORD: ${DEMO_DB_PASSWORD:?Inicialize a demonstração}
+      MYSQL_ROOT_PASSWORD: ${DEMO_DB_ROOT_PASSWORD:?Inicialize a demonstração}
+    restart: unless-stopped
+    volumes: ["demo-mysql:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h 127.0.0.1 -u biblioteca_demo -D biblioteca_demo -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+    volumes: ["demo-redis:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis-cache:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    ports: ["127.0.0.1:${DEMO_MAIL_PORT:-8029}:8025"]
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "500"
+    volumes: ["demo-mail:/data"]
+    restart: unless-stopped
+
+volumes:
+  demo-storage:
+  demo-mysql:
+  demo-redis:
+  demo-mail:

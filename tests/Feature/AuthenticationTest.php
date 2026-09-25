@@ -20,7 +20,7 @@ class AuthenticationTest extends TestCase
             'password_confirmation' => 'segredo123',
         ]);
 
-        $response->assertRedirect(route('home'));
+        $response->assertRedirect(route('portal.index'));
         $response->assertSessionMissing('_old_input.password');
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
@@ -45,7 +45,7 @@ class AuthenticationTest extends TestCase
 
     public function test_valid_login_remembers_user_redirects_to_intended_and_regenerates_session(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->librarian()->create();
         $sessionIdBeforeLogin = $this->app->make('session')->getId();
 
         $response = $this->withSession(['url.intended' => route('livros.index')])

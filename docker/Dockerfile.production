@@ -1,0 +1,49 @@
+FROM composer:2@sha256:9715c7f69044da2a212a5fbde29ee7da24e364d426560ae6367b060236f847d7 AS composer
+FROM php:8.4-apache-bookworm@sha256:57ccfbd765e5ee5f85dee5864e47ca8db0b540b0c091c052d9b275b2498a5395 AS php-base
+RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libonig-dev libzip-dev \
+    && docker-php-ext-install -j2 pdo_mysql mbstring intl zip pcntl bcmath opcache \
+    && pecl install redis-6.2.0 && docker-php-ext-enable redis \
+    && apt-mark manual libicu72 libonig5 libzip4 \
+    && apt-get purge -y --auto-remove libicu-dev libonig-dev libzip-dev $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/* /tmp/pear \
+    && a2enmod rewrite headers \
+    && sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
+    && mkdir -p /var/run/apache2 /var/lock/apache2 \
+    && chown -R www-data:www-data /var/run/apache2 /var/lock/apache2
+COPY docker/production/apache.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/production/php.ini /usr/local/etc/php/conf.d/99-production.ini
+WORKDIR /var/www/html
+
+FROM php-base AS dependencies
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+ENV COMPOSER_ALLOW_SUPERUSER=1
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader --no-progress
+COPY app app
+COPY bootstrap bootstrap
+COPY config config
+COPY database database
+COPY lang lang
+COPY public public
+COPY resources resources
+COPY routes routes
+COPY artisan ./
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && composer dump-autoload --no-dev --classmap-authoritative --no-scripts \
+    && composer check-platform-reqs --no-dev \
+    && php artisan package:discover --ansi
+
+FROM php-base AS production
+ARG RELEASE_ID=local
+LABEL org.opencontainers.image.title="Biblioteca" org.opencontainers.image.revision=$RELEASE_ID
+COPY --from=dependencies --chown=root:root /var/www/html /var/www/html
+COPY --chmod=755 docker/production/entrypoint.sh /usr/local/bin/biblioteca-entrypoint
+RUN printf '%s\n' "$RELEASE_ID" > /opt/biblioteca-release \
+    && chown root:root /var/www/html \
+    && find /var/www/html -type d -exec chmod 755 {} + \
+    && find /var/www/html -type f -exec chmod 644 {} + \
+    && chown -R www-data:www-data storage bootstrap/cache
+USER www-data
+EXPOSE 8080
+ENTRYPOINT ["biblioteca-entrypoint"]
+CMD ["apache2-foreground"]

@@ -18,7 +18,7 @@ class CreateLocacoesTable extends Migration
             $table->date('data_locacao');
             $table->date('data_devolucao');
             $table->date('data_devolvido')->nullable();
-            $table->enum('status', ['ativa','devolvida','atrasada'])->default('ativa');
+            $table->enum('status', ['ativa', 'devolvida', 'atrasada'])->default('ativa');
             $table->timestamps();
         });
     }
@@ -30,4 +30,4 @@ class CreateLocacoesTable extends Migration
     {
         Schema::dropIfExists('locacoes');
     }
-};
+}

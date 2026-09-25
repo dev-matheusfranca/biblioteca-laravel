@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserRole;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
@@ -20,10 +21,10 @@ class AuthController extends Controller
     {
         $credentials = $request->validated();
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (Auth::attempt([...$credentials, 'is_active' => true], $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended(route('home'));
+            return redirect()->intended(route('portal.index'));
         }
 
         return back()->withErrors(['email' => 'Credenciais inválidas'])->onlyInput('email');
@@ -43,11 +44,15 @@ class AuthController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
         ]);
+        $user->forceFill([
+            'role' => UserRole::Reader,
+            'is_active' => true,
+        ])->save();
 
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('home');
+        return redirect()->route('portal.index');
     }
 
     public function logout(Request $request)

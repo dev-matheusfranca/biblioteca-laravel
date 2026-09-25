@@ -2,121 +2,95 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Circulation\CheckoutExemplar;
+use App\Actions\Circulation\CloseLoan;
+use App\Actions\Circulation\RenewLoan;
+use App\Enums\UserRole;
 use App\Http\Requests\Locacao\LocacaoIndexRequest;
 use App\Http\Requests\Locacao\StoreLocacaoRequest;
 use App\Models\Livro;
 use App\Models\Locacao;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use App\Services\CurrentCirculationPolicy;
+use DomainException;
+use Illuminate\Http\Request;
 
 class LocacaoController extends Controller
 {
     public function index(LocacaoIndexRequest $request)
     {
-        $locacoes = Locacao::query()
-            ->with(['usuario', 'livro'])
-            ->when($request->filled('q'), function ($query) use ($request) {
-                $search = '%'.$request->string('q')->trim().'%';
-
-                $query->where(function ($query) use ($search) {
-                    $query->whereHas('usuario', fn ($query) => $query->where('name', 'like', $search))
-                        ->orWhereHas('livro', fn ($query) => $query->where('titulo', 'like', $search));
-                });
-            })
-            ->when($request->input('status') === 'ativa', function ($query) {
-                $query->where('status', '!=', 'devolvida');
-            })
-            ->when($request->input('status') === 'devolvida', function ($query) {
-                $query->where('status', 'devolvida');
-            })
-            ->when($request->input('status') === 'atrasada', function ($query) {
-                $query->where('status', '!=', 'devolvida')
-                    ->whereDate('data_devolucao', '<', today());
-            })
-            ->orderByDesc('data_locacao')
-            ->orderByDesc('id')
-            ->paginate(10)
-            ->withQueryString();
+        $locacoes = Locacao::query()->with(['usuario', 'livro', 'exemplar'])
+            ->when($request->filled('q'), fn ($q) => $q->where(fn ($search) => $search->whereHas('usuario', fn ($u) => $u->where('name', 'like', '%'.$request->string('q')->trim().'%'))->orWhereHas('livro', fn ($b) => $b->where('titulo', 'like', '%'.$request->string('q')->trim().'%'))))
+            ->when($request->input('status') === 'ativa', fn ($q) => $q->whereNull('encerrado_em'))
+            ->when($request->input('status') === 'devolvida', fn ($q) => $q->whereNotNull('encerrado_em')->where('encerramento_motivo', 'devolucao'))
+            ->when($request->input('status') === 'atrasada', fn ($q) => $q->whereNull('encerrado_em')->whereDate('data_devolucao', '<', today()))
+            ->orderByDesc('data_locacao')->paginate(10)->withQueryString();
 
         return view('locacoes.index', compact('locacoes'));
     }
 
-    public function create()
+    public function create(CurrentCirculationPolicy $policies)
     {
-        $usuarios = User::query()->orderBy('name')->orderBy('id')->get();
+        $usuarios = User::query()->where('role', UserRole::Reader->value)->where('is_active', true)->orderBy('name')->get();
         $livros = Livro::query()
             ->where('status', 'ativo')
-            ->where('quantidade_disponivel', '>', 0)
+            ->where('modo_acervo', 'exemplares')
+            ->withCount(['reservas as reservas_ativas_count' => fn ($query) => $query->whereNotNull('active_key')])
             ->orderBy('titulo')
-            ->orderBy('id')
             ->get();
+        $policy = $policies->get();
 
-        return view('locacoes.create', compact('usuarios', 'livros'));
+        return view('locacoes.create', compact('usuarios', 'livros', 'policy'));
     }
 
-    public function store(StoreLocacaoRequest $request)
+    public function store(StoreLocacaoRequest $request, CheckoutExemplar $checkout)
     {
         $data = $request->validated();
+        try {
+            $checkout->execute($request->user(), $data['usuario_id'], $data['livro_id'], (string) ($data['data_devolucao'] ?? ''), $data['exemplar_id'] ?? null);
+        } catch (DomainException $e) {
+            return back()->withErrors([str_contains(mb_strtolower($e->getMessage()), 'leitor') ? 'usuario_id' : 'livro_id' => $e->getMessage()])->withInput();
+        }
 
-        return DB::transaction(function () use ($data) {
-            $livro = Livro::lockForUpdate()->findOrFail($data['livro_id']);
-
-            if ($livro->status !== 'ativo' || $livro->quantidade_disponivel <= 0) {
-                return back()->withErrors(['livro_id' => 'Livro indisponível para empréstimo.'])->withInput();
-            }
-
-            $already = Locacao::where('usuario_id', $data['usuario_id'])
-                ->where('livro_id', $data['livro_id'])
-                ->where('status', '!=', 'devolvida')
-                ->first();
-
-            if ($already) {
-                return back()->withErrors(['usuario_id' => 'O usuário já possui este livro emprestado.'])->withInput();
-            }
-
-            Locacao::create([
-                'usuario_id' => $data['usuario_id'],
-                'livro_id' => $data['livro_id'],
-                'data_locacao' => now()->toDateString(),
-                'data_devolucao' => $data['data_devolucao'],
-                'status' => 'ativa',
-            ]);
-
-            $livro->decrement('quantidade_disponivel');
-
-            return redirect()->route('locacoes.index')->with('success', 'Empréstimo criado.');
-        });
+        return redirect()->route('locacoes.index')->with('success', 'Empréstimo criado.');
     }
 
-    public function show(Locacao $locacao)
+    public function show(Locacao $locacao, RenewLoan $renew)
     {
-        $locacao->load(['usuario', 'livro']);
+        $locacao->load(['usuario', 'livro', 'exemplar', 'renovacoes']);
+        $motivoRenovacao = $renew->blockReason(request()->user(), $locacao);
+        $podeRenovar = $motivoRenovacao === null;
 
-        return view('locacoes.show', compact('locacao'));
+        return view('locacoes.show', compact('locacao', 'podeRenovar', 'motivoRenovacao'));
     }
 
-    public function devolver(Locacao $locacao)
+    public function devolver(Request $request, Locacao $locacao, CloseLoan $closeLoan)
     {
-        return DB::transaction(function () use ($locacao) {
-            $locacao = Locacao::query()->lockForUpdate()->findOrFail($locacao->getKey());
+        $ok = $closeLoan->return($request->user(), $locacao);
 
-            if ($locacao->status === 'devolvida') {
-                return redirect()->route('locacoes.index')->with('error', 'Este empréstimo já foi devolvido.');
-            }
+        return redirect()->route('locacoes.index')->with($ok ? 'success' : 'error', $ok ? 'Empréstimo devolvido com sucesso.' : 'Este empréstimo já foi encerrado.');
+    }
 
-            $livro = Livro::query()->lockForUpdate()->findOrFail($locacao->livro_id);
-            $livro->quantidade_disponivel = min(
-                $livro->quantidade_total,
-                $livro->quantidade_disponivel + 1
-            );
-            $livro->save();
+    public function encerrarPorPerda(Request $request, Locacao $locacao, CloseLoan $closeLoan)
+    {
+        $data = $request->validate(['motivo' => ['required', 'string', 'max:1000']]);
+        try {
+            $ok = $closeLoan->loss($request->user(), $locacao, $data['motivo']);
+        } catch (DomainException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
 
-            $locacao->update([
-                'status' => 'devolvida',
-                'data_devolvido' => now()->toDateString(),
-            ]);
+        return redirect()->route('locacoes.index')->with($ok ? 'success' : 'error', $ok ? 'Empréstimo encerrado por perda.' : 'Este empréstimo já foi encerrado.');
+    }
 
-            return redirect()->route('locacoes.index')->with('success', 'Empréstimo devolvido com sucesso.');
-        });
+    public function renovar(Request $request, Locacao $locacao, RenewLoan $renew)
+    {
+        try {
+            $renew->execute($request->user(), $locacao);
+        } catch (DomainException $exception) {
+            return back()->withErrors(['renovacao' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Empréstimo renovado.');
     }
 }

@@ -5,7 +5,7 @@
     <section class="auth-intro">
         <span class="eyebrow">BEM-VINDO DE VOLTA</span>
         <h1>Sua biblioteca.<br>Seu próximo capítulo.</h1>
-        <p>Acesse sua conta para organizar o acervo e acompanhar as leituras em andamento.</p>
+        <p>Acesse sua conta para acompanhar suas leituras e os prazos de devolução.</p>
         <div class="auth-benefits">
             <div class="auth-benefit">@include('partials.icon', ['name' => 'book']) Todo o acervo em um só lugar</div>
             <div class="auth-benefit">@include('partials.icon', ['name' => 'arrows']) Empréstimos fáceis de acompanhar</div>
@@ -30,6 +30,7 @@
             <label class="checkbox-field" for="remember"><input type="checkbox" name="remember" id="remember" value="1" @checked(old('remember'))> Manter conectado neste dispositivo</label>
             <button class="btn btn-primary" type="submit">Entrar @include('partials.icon', ['name' => 'arrow'])</button>
         </form>
+        <p class="auth-switch"><a href="{{ route('password.request') }}">Esqueci minha senha</a></p>
         <p class="auth-switch">Ainda não tem uma conta? <a href="{{ route('register') }}">Criar conta</a></p>
     </section>
 </div>

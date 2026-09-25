@@ -10,6 +10,7 @@
             <p>Consulte a disponibilidade e mantenha o catálogo organizado.</p>
         </div>
         <div class="page-actions">
+            <a href="{{ route('isbn.index') }}" class="btn btn-secondary">Consultar ISBN</a>
             <a href="{{ route('livros.create') }}" class="btn btn-primary">Cadastrar livro</a>
         </div>
     </header>
@@ -70,7 +71,7 @@
                     </thead>
                     <tbody>
                         @foreach($livros as $livro)
-                            @php($disponivel = $livro->quantidade_disponivel > 0)
+                            @php($disponivel = ($livro->usaExemplares() && $livro->quantidade_disponivel > 0))
                             @php($podeEmprestar = $livro->status === 'ativo' && $disponivel)
                             <tr>
                                 <td>

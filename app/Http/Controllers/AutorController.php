@@ -43,9 +43,14 @@ class AutorController extends Controller
 
     public function show(Autor $autor)
     {
-        $autor->load(['livros.autor', 'livros.categoria']);
+        $livros = $autor->livros()
+            ->with(['autor', 'categoria'])
+            ->orderBy('titulo')
+            ->orderBy('id')
+            ->paginate(10, ['*'], 'livros_page')
+            ->withQueryString();
 
-        return view('autores.show', compact('autor'));
+        return view('autores.show', compact('autor', 'livros'));
     }
 
     public function edit(Autor $autor)

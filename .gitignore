@@ -1,8 +1,14 @@
 *.log
+__pycache__/
+*.pyc
 .DS_Store
 .env
 .env.backup
 .env.production
+.env.docker
+.env.demo
+/.demo/
+/output/releases/
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -23,4 +29,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /.playwright-cli/
+/.playwright-mcp/
 /output/playwright/
+/output/testing/
+/__FILES/

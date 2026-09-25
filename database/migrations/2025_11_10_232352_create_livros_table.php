@@ -20,7 +20,7 @@ class CreateLivrosTable extends Migration
             $table->integer('quantidade_total')->default(0);
             $table->integer('quantidade_disponivel')->default(0);
             $table->string('isbn')->nullable();
-            $table->enum('status', ['ativo','inativo'])->default('ativo');
+            $table->enum('status', ['ativo', 'inativo'])->default('ativo');
             $table->timestamps();
         });
     }
@@ -32,4 +32,4 @@ class CreateLivrosTable extends Migration
     {
         Schema::dropIfExists('livros');
     }
-};
+}

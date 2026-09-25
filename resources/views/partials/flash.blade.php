@@ -1,3 +1,6 @@
+@if(session('status'))
+    <div class="alert alert-success" role="status">{{ session('status') }}</div>
+@endif
 @if(session('success'))
     <div class="alert alert-success" role="status">@include('partials.icon', ['name' => 'check'])<span>{{ session('success') }}</span></div>
 @endif
