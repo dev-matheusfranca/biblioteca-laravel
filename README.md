@@ -39,7 +39,7 @@ Essa validação não é um teste de carga, certificação de entrega SMTP exter
 - O envio de e-mail usa uma outbox para preservar a intenção, mas SMTP não oferece garantia de entrega exatamente uma vez.
 - O catálogo pode servir resultado em cache até a invalidação/TTL; em falha do cache, consulta o banco.
 - ISBN é uma sugestão de edição da Open Library: o operador continua responsável pela confirmação e pelo cadastro manual.
-- O CI remoto está preparado, mas não teve execução remota; o ganho de p95 no benchmark local foi 14,73% (352,33 ms para 300,44 ms), abaixo da meta exploratória de 20% (281,86 ms), sem constituir promessa de escala ou SLA.
+- Os resultados das execuções remotas estão no [GitHub Actions](https://github.com/dev-matheusfranca/biblioteca-laravel/actions/workflows/quality.yml). O ganho de p95 no benchmark local foi 14,73% (352,33 ms para 300,44 ms), abaixo da meta exploratória de 20% (281,86 ms), sem constituir promessa de escala ou SLA.
 
 ## Desenvolvimento
 

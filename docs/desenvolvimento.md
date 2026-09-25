@@ -22,6 +22,12 @@ O inicializador gera segredos aleatórios em `.env.docker` ignorado pelo Git. El
 
 `DOCKER_APP_PORT` e `DOCKER_MAIL_PORT` permitem ajustar as portas. Não altere senhas de `.env.docker` após criar o volume MySQL sem realizar a correspondente rotação no banco. Não apague volumes para contornar falha de acesso. `docker compose --env-file .env.docker stop` para os serviços sem remover dados.
 
+### Permissão do script de inicialização MySQL
+
+`docker/mysql/init-testing.sh` deve permanecer executável no Git (`100755`). A imagem MySQL executa scripts `.sh` com esse bit em outro processo; arquivos não executáveis são carregados com `source`. Nesse segundo caso, `set -u` do script afeta o entrypoint e encerra a primeira inicialização ao consultar a variável opcional `MYSQL_ONETIME_PASSWORD`.
+
+O primeiro CI Linux reproduziu essa diferença, que o bind mount do Docker Desktop no Windows mascarava. O ensaio de regressão em container novo, sem portas ou volumes existentes, confirmou falha com `0644` e sucesso com `0755`, incluindo criação de `biblioteca_testing` e autenticação de `biblioteca_test`. Preserve o modo ao alterar ou transportar o script; não contorne a falha apagando volumes existentes.
+
 ## Primeiro administrador e usuários existentes
 
 Cadastre uma conta pelo formulário público. Ela terá acesso imediato como leitor. Para provisionar o administrador, execute:
