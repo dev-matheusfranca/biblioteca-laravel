@@ -16,7 +16,8 @@ class StoreLocacaoRequest extends FormRequest
         return [
             'usuario_id' => ['required', 'exists:users,id'],
             'livro_id' => ['required', 'exists:livros,id'],
-            'data_devolucao' => ['required', 'date', 'after:today'],
+            'exemplar_id' => ['nullable', 'exists:exemplares,id'],
+            'data_devolucao' => ['nullable', 'date'],
         ];
     }
 

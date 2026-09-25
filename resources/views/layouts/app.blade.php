@@ -30,16 +30,29 @@
             <div class="nav-label">ESPAÇO DA BIBLIOTECA</div>
             <nav class="primary-nav" aria-label="Navegação principal">
                 <a href="{{ route('home') }}" @class(['nav-item', 'is-active' => request()->routeIs('home')]) @if(request()->routeIs('home')) aria-current="page" @endif>@include('partials.icon', ['name' => 'grid']) Visão geral</a>
+                <a href="{{ route('catalogo.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('catalogo.*')]) @if(request()->routeIs('catalogo.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'book']) Catálogo público</a>
                 @auth
+                    <a href="{{ route('portal.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('portal.*')]) @if(request()->routeIs('portal.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'clock']) Minha conta</a>
+                @endauth
+                @if(auth()->user()?->isActive() && auth()->user()?->role === \App\Enums\UserRole::Reader)
+                    <a href="{{ route('tokens.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('tokens.*')])>@include('partials.icon', ['name' => 'grid']) Acesso à API</a>
+                @endif
+                @can('manage-library')
+                    <a href="{{ route('relatorios.circulacao') }}" @class(['nav-item', 'is-active' => request()->routeIs('relatorios.*')])>@include('partials.icon', ['name' => 'grid']) Relatórios</a>
                     <a href="{{ route('livros.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('livros.*')]) @if(request()->routeIs('livros.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'book']) Acervo de livros</a>
                     <a href="{{ route('locacoes.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('locacoes.*')]) @if(request()->routeIs('locacoes.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'arrows']) Empréstimos</a>
+                    <a href="{{ route('reservas.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('reservas.index')])>@include('partials.icon', ['name' => 'clock']) Reservas</a>
                     <span class="nav-label">ORGANIZAÇÃO</span>
                     <a href="{{ route('autores.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('autores.*')]) @if(request()->routeIs('autores.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'pen']) Autores</a>
                     <a href="{{ route('categorias.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('categorias.*')]) @if(request()->routeIs('categorias.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'tag']) Categorias</a>
-                @else
-                    <a class="nav-item" href="{{ route('login') }}">@include('partials.icon', ['name' => 'book']) Acessar o acervo</a>
-                    <a class="nav-item" href="{{ route('login') }}">@include('partials.icon', ['name' => 'arrows']) Gerenciar empréstimos</a>
-                @endauth
+                    <a href="{{ route('leitores.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('leitores.*')]) @if(request()->routeIs('leitores.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'grid']) Leitores</a>
+                @endcan
+                @can('manage-users')
+                    <a href="{{ route('operacao.saude') }}" @class(['nav-item', 'is-active' => request()->routeIs('operacao.saude')])>@include('partials.icon', ['name' => 'grid']) Saúde da operação</a>
+                    <a href="{{ route('operacao.comunicacoes.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('operacao.*')])>@include('partials.icon', ['name' => 'clock']) Comunicações</a>
+                    <a href="{{ route('configuracoes.circulacao.edit') }}" @class(['nav-item', 'is-active' => request()->routeIs('configuracoes.*')])>@include('partials.icon', ['name' => 'grid']) Regras de circulação</a>
+                    <a href="{{ route('equipe.index') }}" @class(['nav-item', 'is-active' => request()->routeIs('equipe.*')]) @if(request()->routeIs('equipe.*')) aria-current="page" @endif>@include('partials.icon', ['name' => 'grid']) Equipe e acessos</a>
+                @endcan
             </nav>
             <div class="sidebar-note">
                 @include('partials.icon', ['name' => 'spark'])

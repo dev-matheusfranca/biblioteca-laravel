@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Circulation\AllocateReservationsForBook;
 use App\Http\Requests\Livro\LivroIndexRequest;
 use App\Http\Requests\Livro\LivroRequest;
 use App\Models\Autor;
@@ -30,11 +31,13 @@ class LivroController extends Controller
             })
             ->when($request->input('disponibilidade') === 'disponivel', function ($query) {
                 $query->where('status', 'ativo')
+                    ->where('modo_acervo', 'exemplares')
                     ->where('quantidade_disponivel', '>', 0);
             })
             ->when($request->input('disponibilidade') === 'indisponivel', function ($query) {
                 $query->where(function ($query) {
                     $query->where('quantidade_disponivel', '<=', 0)
+                        ->orWhere('modo_acervo', '!=', 'exemplares')
                         ->orWhere('status', '!=', 'ativo');
                 });
             })
@@ -68,9 +71,15 @@ class LivroController extends Controller
 
     public function show(Livro $livro)
     {
-        $livro->load(['autor', 'categoria', 'locacoes.usuario']);
+        $livro->load(['autor', 'categoria']);
+        $locacoes = $livro->locacoes()
+            ->with('usuario')
+            ->orderByDesc('data_locacao')
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'emprestimos_page')
+            ->withQueryString();
 
-        return view('livros.show', compact('livro'));
+        return view('livros.show', compact('livro', 'locacoes'));
     }
 
     public function edit(Livro $livro)
@@ -87,6 +96,9 @@ class LivroController extends Controller
 
         return DB::transaction(function () use ($livro, $data) {
             $livro = Livro::query()->lockForUpdate()->findOrFail($livro->getKey());
+            if ($livro->usaExemplares() && (int) $data['quantidade_total'] !== $livro->quantidade_total) {
+                return back()->withErrors(['quantidade_total' => 'Após a reconciliação, a quantidade é derivada dos exemplares e não pode ser editada manualmente.'])->withInput();
+            }
             $emprestados = Locacao::query()
                 ->where('livro_id', $livro->id)
                 ->where('status', '!=', 'devolvida')
@@ -98,8 +110,15 @@ class LivroController extends Controller
                 ])->withInput();
             }
 
-            $data['quantidade_disponivel'] = $data['quantidade_total'] - $emprestados;
+            if ($livro->usaExemplares()) {
+                unset($data['quantidade_total']);
+            } else {
+                $data['quantidade_disponivel'] = $data['quantidade_total'] - $emprestados;
+            }
             $livro->update($data);
+            if ($livro->usaExemplares()) {
+                app(AllocateReservationsForBook::class)->executeLocked($livro);
+            }
 
             return redirect()->route('livros.index')->with('success', 'Livro atualizado.');
         });
@@ -110,9 +129,9 @@ class LivroController extends Controller
         return DB::transaction(function () use ($livro) {
             $livro = Livro::query()->lockForUpdate()->findOrFail($livro->getKey());
 
-            if ($livro->locacoes()->exists()) {
+            if ($livro->locacoes()->exists() || $livro->exemplares()->exists()) {
                 return redirect()->route('livros.index')
-                    ->with('error', 'Não é possível remover um livro que possui histórico de empréstimos.');
+                    ->with('error', 'Não é possível remover um livro que possui histórico de empréstimos ou exemplares. Inative o cadastro.');
             }
 
             $livro->delete();

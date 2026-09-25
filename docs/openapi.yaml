@@ -1,0 +1,389 @@
+openapi: 3.1.0
+info:
+  title: API da Biblioteca
+  version: 1.0.0
+  description: Catálogo público e autosserviço do leitor com tokens pessoais de 24 horas.
+servers:
+  - url: http://localhost:8088/api/v1
+    description: Demonstração local
+tags:
+  - name: Catálogo
+  - name: Minha conta
+  - name: Circulação
+paths:
+  /catalogo:
+    get:
+      tags: [Catálogo]
+      operationId: listCatalog
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 255 }
+        - name: categoria
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/BookCollection' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /catalogo/{livro}:
+    get:
+      tags: [Catálogo]
+      operationId: showBook
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Livro ativo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /me:
+    get:
+      tags: [Minha conta]
+      operationId: showMe
+      security: [{ bearerAuth: [] }]
+      x-required-ability: personal:read
+      responses:
+        '200':
+          description: Leitor autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /me/emprestimos:
+    get:
+      tags: [Minha conta]
+      operationId: listMyLoans
+      security: [{ bearerAuth: [] }]
+      x-required-ability: personal:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { $ref: '#/components/responses/LoanCollection' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /me/emprestimos/{locacao}:
+    get:
+      tags: [Minha conta]
+      operationId: showMyLoan
+      security: [{ bearerAuth: [] }]
+      x-required-ability: personal:read
+      parameters:
+        - $ref: '#/components/parameters/LoanId'
+      responses:
+        '200':
+          description: Empréstimo próprio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /me/reservas:
+    get:
+      tags: [Minha conta]
+      operationId: listMyReservations
+      security: [{ bearerAuth: [] }]
+      x-required-ability: personal:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200': { $ref: '#/components/responses/ReservationCollection' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /livros/{livro}/reservas:
+    post:
+      tags: [Circulação]
+      operationId: createReservation
+      security: [{ bearerAuth: [] }]
+      x-required-ability: reservations:write
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Reserva criada ou resposta idempotente repetida
+          headers:
+            Idempotency-Replayed:
+              schema: { type: string, enum: ['true'] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /reservas/{reserva}:
+    delete:
+      tags: [Circulação]
+      operationId: cancelReservation
+      security: [{ bearerAuth: [] }]
+      x-required-ability: reservations:write
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Reserva cancelada ou resposta idempotente repetida
+          headers:
+            Idempotency-Replayed:
+              schema: { type: string, enum: ['true'] }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id, status]
+                    properties:
+                      id: { type: integer }
+                      status: { type: string, const: cancelada }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /emprestimos/{locacao}/renovacoes:
+    post:
+      tags: [Circulação]
+      operationId: renewLoan
+      security: [{ bearerAuth: [] }]
+      x-required-ability: loans:renew
+      parameters:
+        - $ref: '#/components/parameters/LoanId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Empréstimo renovado ou resposta idempotente repetida
+          headers:
+            Idempotency-Replayed:
+              schema: { type: string, enum: ['true'] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoanResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum personal access token
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50 }
+    BookId:
+      name: livro
+      in: path
+      required: true
+      schema: { type: integer }
+    LoanId:
+      name: locacao
+      in: path
+      required: true
+      schema: { type: integer }
+    ReservationId:
+      name: reserva
+      in: path
+      required: true
+      schema: { type: integer }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Author:
+      type: object
+      required: [id, nome]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+    Category:
+      type: object
+      required: [id, nome]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+    Book:
+      type: object
+      required: [id, titulo, autor, categoria, disponibilidade]
+      properties:
+        id: { type: integer }
+        titulo: { type: string }
+        isbn: { type: [string, 'null'] }
+        ano_publicacao: { type: [integer, 'null'] }
+        autor: { $ref: '#/components/schemas/Author' }
+        categoria: { $ref: '#/components/schemas/Category' }
+        disponibilidade:
+          type: object
+          required: [modo, total, disponiveis]
+          properties:
+            modo: { type: string }
+            total: { type: integer }
+            disponiveis: { type: integer }
+    User:
+      type: object
+      required: [id, nome, email, papel]
+      properties:
+        id: { type: integer }
+        nome: { type: string }
+        email: { type: string, format: email }
+        papel: { type: string, const: leitor }
+    Renewal:
+      type: object
+      required: [id, prazo_anterior, novo_prazo]
+      properties:
+        id: { type: integer }
+        prazo_anterior: { type: string, format: date }
+        novo_prazo: { type: string, format: date }
+        criada_em: { type: [string, 'null'], format: date-time }
+    Loan:
+      type: object
+      required: [id, status, data_emprestimo, data_prevista_devolucao, renovacoes_utilizadas, livro]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        data_emprestimo: { type: string, format: date }
+        data_prevista_devolucao: { type: string, format: date }
+        data_devolvida: { type: [string, 'null'], format: date }
+        encerrado_em: { type: [string, 'null'], format: date-time }
+        renovacoes_utilizadas: { type: integer }
+        livro: { $ref: '#/components/schemas/Book' }
+        renovacoes:
+          type: array
+          items: { $ref: '#/components/schemas/Renewal' }
+    Reservation:
+      type: object
+      required: [id, status, livro, criada_em]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [aguardando, disponivel, cancelada, expirada, atendida] }
+        livro: { $ref: '#/components/schemas/Book' }
+        exemplar:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, codigo_patrimonial]
+              properties:
+                id: { type: integer }
+                codigo_patrimonial: { type: string }
+        disponivel_em: { type: [string, 'null'], format: date-time }
+        retirar_ate: { type: [string, 'null'], format: date-time }
+        encerrada_em: { type: [string, 'null'], format: date-time }
+        motivo_encerramento: { type: [string, 'null'] }
+        criada_em: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [message, request_id]
+      properties:
+        message: { type: string }
+        request_id: { type: string, format: uuid }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    BookResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Book' }
+    LoanResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Loan' }
+    ReservationResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Reservation' }
+  responses:
+    BookCollection:
+      description: Página de livros ativos
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, links, meta]
+            properties:
+              data: { type: array, items: { $ref: '#/components/schemas/Book' } }
+              links: { type: object }
+              meta: { type: object }
+    LoanCollection:
+      description: Página de empréstimos próprios
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, links, meta]
+            properties:
+              data: { type: array, items: { $ref: '#/components/schemas/Loan' } }
+              links: { type: object }
+              meta: { type: object }
+    ReservationCollection:
+      description: Página de reservas próprias
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, links, meta]
+            properties:
+              data: { type: array, items: { $ref: '#/components/schemas/Reservation' } }
+              links: { type: object }
+              meta: { type: object }
+    Unauthenticated:
+      description: Token ausente, inválido ou expirado
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Conta ou ability sem acesso
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Recurso inexistente ou não pertencente ao leitor
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Chave de idempotência reutilizada para outra requisição
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ValidationError:
+      description: Dados ou regra de circulação inválidos
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    RateLimited:
+      description: Limite de requisições excedido
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

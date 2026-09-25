@@ -1,0 +1,108 @@
+{
+  "date": "2026-09-25",
+  "scope": "local Docker demonstration, synthetic data only",
+  "current_release": "b48a2325b4aa12faacb5",
+  "image_id": "sha256:301d0c3887a710a30c3d2454a74257264a4ae57c9660a331e489b50e0b0d2415",
+  "health": "healthy",
+  "services": 7,
+  "counts": {
+    "users": 5,
+    "livros": 14,
+    "exemplares": 30,
+    "locacoes": 5,
+    "reservas": 3
+  },
+  "invalid_open_loans": 0,
+  "runtime": {
+    "php": "8.4.26",
+    "server": "Apache",
+    "user": "www-data",
+    "source_readonly": true,
+    "storage_writable": true,
+    "compiled_views_per_release": true,
+    "seed_passwords_absent_from_permanent_runtime": true
+  },
+  "tests": {
+    "sqlite": {
+      "tests": 147,
+      "assertions": 937
+    },
+    "mysql": {
+      "discovered": 158,
+      "executed": 152,
+      "assertions": 958,
+      "skipped": 6,
+      "skip_reason": "DemoSeeder guard allows SQLite memory in tests; real MySQL seed tested in dedicated demonstration"
+    },
+    "release_python": 13,
+    "php_syntax_changed_files_including_blade": 238,
+    "pint": "passed",
+    "phpstan": "passed",
+    "assets": "passed",
+    "vite_build": "passed",
+    "dependency_audits": "no reported advisories"
+  },
+  "browser": {
+    "viewport_width": 390,
+    "horizontal_overflow": false,
+    "final_page_errors": 0,
+    "reader_management_access": 403,
+    "admin_management_and_health": 200,
+    "renewal_preserved_after_release": "2026-10-23",
+    "return_preserved": true,
+    "fifo_reservation_ready_notice_verified": true,
+    "mailpit_messages_after_return": 4
+  },
+  "recovery": {
+    "injected_failure": {
+      "scenario": "post-switch injected verification failure",
+      "recovered_release": "5756e4cf2fa7c74dbaa2",
+      "http_checks": 2,
+      "health": "healthy",
+      "elapsed_seconds": 160.47,
+      "journal_cleared": true
+    },
+    "rollback": {
+      "rollback_release": "5756e4cf2fa7c74dbaa2",
+      "rollback_seconds": 78.86,
+      "redeployed_release": "1b1b09c7cd48e3e46c14",
+      "redeploy_seconds": 80.78,
+      "health": "healthy",
+      "counts": {
+        "users": 5,
+        "livros": 14,
+        "exemplares": 30,
+        "locacoes": 5,
+        "reservas": 3
+      }
+    },
+    "restore": {
+      "restored_database": "biblioteca_demo_restore_20260925201903352063",
+      "source_unchanged": true,
+      "checksum": "verified",
+      "storage_isolated": true,
+      "authenticated_http_canary": true,
+      "elapsed_seconds": 10.93,
+      "backup_created_at": "2026-09-25T20:18:43.917697+00:00",
+      "release": "b48a2325b4aa12faacb5",
+      "counts": {
+        "users": 5,
+        "livros": 14,
+        "exemplares": 30,
+        "locacoes": 5,
+        "reservas": 3
+      },
+      "invalid_open_loans": 0,
+      "schema_signature": "a079b03b6270c02cc4d910716ca6db9686b244856362522e787dbc1a6d693c48"
+    },
+    "source_circulation_digest_unchanged": true
+  },
+  "limitations": [
+    "No public hosting or remote CI execution",
+    "SMTP delivery is local Mailpit only",
+    "Restore rehearses a separate database; it does not reset the active dataset",
+    "Elapsed recovery times are local observations, not SLAs",
+    "F6 catalog p95 improvement was 14.73 percent, below the exploratory 20 percent target",
+    "External ISBN provider may time out; manual entry stays available"
+  ]
+}

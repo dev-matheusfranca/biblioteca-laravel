@@ -1,0 +1,153 @@
+name: biblioteca-dev
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  image: biblioteca-dev-app
+  dns_opt: ["timeout:1", "attempts:1"]
+  environment: &environment
+    APP_NAME: Biblioteca
+    APP_ENV: local
+    APP_DEBUG: "false"
+    APP_KEY: ${DOCKER_APP_KEY:?Execute node scripts/init-docker.mjs}
+    APP_URL: http://localhost:${DOCKER_APP_PORT:-8088}
+    APP_LOCALE: pt_BR
+    APP_TIMEZONE: America/Sao_Paulo
+    LOG_CHANNEL: stderr
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: "3306"
+    DB_DATABASE: biblioteca_dev
+    DB_USERNAME: biblioteca
+    DB_PASSWORD: ${DOCKER_DB_PASSWORD:?Inicialize .env.docker}
+    DB_URL: ""
+    CATALOG_CACHE_STORE: catalog
+    REDIS_CATALOG_HOST: redis-cache
+    CATALOG_CACHE_ENABLED: ${CATALOG_CACHE_ENABLED:-true}
+    CACHE_STORE: database
+    SESSION_DRIVER: database
+    SESSION_COOKIE: biblioteca_dev_session
+    QUEUE_CONNECTION: redis
+    REDIS_QUEUE_RETRY_AFTER: "90"
+    REDIS_PREFIX: "biblioteca_dev:"
+    HORIZON_PREFIX: "biblioteca_dev_horizon:"
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    MAIL_MAILER: smtp
+    MAIL_HOST: mailpit
+    MAIL_PORT: "1025"
+    MAIL_TIMEOUT: "10"
+    MAIL_FROM_ADDRESS: biblioteca@example.test
+    MAIL_FROM_NAME: Biblioteca
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    redis-cache:
+      condition: service_healthy
+    mailpit:
+      condition: service_started
+
+services:
+  app:
+    <<: *app
+    ports:
+      - "127.0.0.1:${DOCKER_APP_PORT:-8088}:8000"
+    volumes:
+      - app-storage:/var/www/html/storage
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/up') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  worker:
+    <<: *app
+    command: ["php", "artisan", "horizon"]
+    restart: unless-stopped
+    stop_grace_period: 45s
+    volumes:
+      - app-storage:/var/www/html/storage
+    healthcheck:
+      test: ["CMD", "php", "artisan", "horizon:status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      test: ["CMD", "php", "artisan", "operacoes:saude", "--scheduler-only", "--json"]
+      interval: 30s
+      timeout: 5s
+      start_period: 100s
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 45s
+    volumes:
+      - app-storage:/var/www/html/storage
+  tests:
+    <<: *app
+    profiles: [tools]
+    environment:
+      <<: *environment
+      APP_ENV: testing
+      BIBLIOTECA_TEST_DB_HOST: mysql
+      BIBLIOTECA_TEST_DB_PASSWORD: ${DOCKER_TEST_DB_PASSWORD:?Inicialize .env.docker}
+      BIBLIOTECA_TEST_REDIS_HOST: redis
+      APP_DEBUG: "false"
+      DB_DATABASE: biblioteca_testing
+      DB_USERNAME: biblioteca_test
+      DB_PASSWORD: ${DOCKER_TEST_DB_PASSWORD:?Inicialize .env.docker}
+      CATALOG_CACHE_STORE: array
+      CATALOG_REVISION_STORE: array
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+    command: ["php", "vendor/bin/phpunit", "--configuration", "phpunit.mysql.xml"]
+  mysql:
+    image: mysql:8.4@sha256:0744ee5ef89ce6ccfa13de3e579fe6b9e27f93dd70da9c06d2c908b1b193fb8d
+    environment:
+      MYSQL_DATABASE: biblioteca_dev
+      MYSQL_USER: biblioteca
+      MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD:?Inicialize .env.docker}
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:?Inicialize .env.docker}
+      MYSQL_TEST_PASSWORD: ${DOCKER_TEST_DB_PASSWORD:?Inicialize .env.docker}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init-testing.sh:/docker-entrypoint-initdb.d/10-testing.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h 127.0.0.1 -u biblioteca -D biblioteca_dev -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis-cache:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit:v1.27@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    ports:
+      - "127.0.0.1:${DOCKER_MAIL_PORT:-8028}:8025"
+
+volumes:
+  mysql-data:
+  redis-data:
+  app-storage:

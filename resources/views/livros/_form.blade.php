@@ -45,7 +45,8 @@
 
     <div class="field">
         <label for="quantidade_total">Quantidade total</label>
-        <input id="quantidade_total" name="quantidade_total" type="number" class="form-control" value="{{ old('quantidade_total', $livro?->quantidade_total) }}" required min="0" inputmode="numeric">
+        <input id="quantidade_total" name="quantidade_total" type="number" class="form-control" value="{{ old('quantidade_total', $livro?->quantidade_total) }}" required min="0" inputmode="numeric" @readonly($livro?->usaExemplares())>
+        <small>Após a conferência, a quantidade é calculada pelos exemplares cadastrados.</small>
         @error('quantidade_total')<p class="field-error">{{ $message }}</p>@enderror
     </div>
 

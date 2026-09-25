@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Categoria extends Model
 {
@@ -13,7 +14,8 @@ class Categoria extends Model
 
     protected $fillable = ['nome', 'descricao'];
 
-    public function livros()
+    /** @return HasMany<Livro, $this> */
+    public function livros(): HasMany
     {
         return $this->hasMany(Livro::class, 'categoria_id');
     }

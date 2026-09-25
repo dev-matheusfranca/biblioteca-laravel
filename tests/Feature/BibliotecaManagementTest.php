@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
+use Tests\Support\PhysicalCatalog;
 use Tests\TestCase;
 
 class BibliotecaManagementTest extends TestCase
@@ -34,14 +35,14 @@ class BibliotecaManagementTest extends TestCase
             'quantidade_total' => 3,
             'quantidade_disponivel' => 2,
         ]);
-        Livro::create([
+        PhysicalCatalog::book([
             'titulo' => 'Livro Inativo',
             'autor_id' => $autor->id,
             'categoria_id' => $categoria->id,
             'quantidade_total' => 5,
             'quantidade_disponivel' => 5,
             'status' => 'inativo',
-        ]);
+        ], author: $autor, category: $categoria);
 
         $this->get(route('home'))
             ->assertOk()
@@ -59,23 +60,23 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_authenticated_home_exposes_full_catalog_and_open_rental_statistics(): void
     {
-        $operator = User::factory()->create();
+        $operator = User::factory()->librarian()->create();
         [$autor, $categoria, $livroAtivo] = $this->catalogo([
             'quantidade_total' => 3,
-            'quantidade_disponivel' => 1,
+            'quantidade_disponivel' => 2,
         ]);
-        Livro::create([
+        PhysicalCatalog::book([
             'titulo' => 'Livro Inativo',
             'autor_id' => $autor->id,
             'categoria_id' => $categoria->id,
             'quantidade_total' => 5,
             'quantidade_disponivel' => 5,
             'status' => 'inativo',
-        ]);
-        $aberto = $this->locacao(User::factory()->create(), $livroAtivo, [
+        ], author: $autor, category: $categoria);
+        $aberto = $this->locacao(User::factory()->reader()->create(), $livroAtivo, [
             'data_devolucao' => Carbon::yesterday()->toDateString(),
         ]);
-        $this->locacao(User::factory()->create(), $livroAtivo, [
+        $this->locacao(User::factory()->reader()->create(), $livroAtivo, [
             'status' => 'devolvida',
             'data_devolvido' => Carbon::today()->toDateString(),
         ]);
@@ -98,7 +99,7 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_authenticated_user_can_render_every_registered_management_view(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->librarian()->create();
         [$autor, $categoria, $livro] = $this->catalogo();
         $locacao = $this->locacao($user, $livro);
 
@@ -123,7 +124,7 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_book_onboarding_explains_missing_catalog_and_disables_submission(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->librarian()->create();
 
         $this->actingAs($user)->get(route('livros.create'))
             ->assertOk()
@@ -133,10 +134,40 @@ class BibliotecaManagementTest extends TestCase
             ->assertSee('type="submit" class="btn btn-primary" disabled', false);
     }
 
+    public function test_new_books_wait_for_inventory_reconciliation_before_circulation(): void
+    {
+        $operator = User::factory()->librarian()->create();
+        $reader = User::factory()->reader()->create();
+        $author = Autor::create(['nome' => 'Autora nova', 'nacionalidade' => 'Brasileira']);
+        $category = Categoria::create(['nome' => 'Novidades']);
+
+        $this->actingAs($operator)->post(route('livros.store'), [
+            'titulo' => 'Título a conferir',
+            'autor_id' => $author->id,
+            'categoria_id' => $category->id,
+            'quantidade_total' => 2,
+            'status' => 'ativo',
+        ])->assertRedirect(route('livros.index'));
+
+        $book = Livro::query()->where('titulo', 'Título a conferir')->firstOrFail();
+        $this->assertDatabaseHas('livros', [
+            'id' => $book->id,
+            'modo_acervo' => 'reconciliacao',
+            'quantidade_total' => 2,
+            'quantidade_disponivel' => 2,
+        ]);
+
+        $this->actingAs($operator)->post(route('locacoes.store'), [
+            'usuario_id' => $reader->id,
+            'livro_id' => $book->id,
+            'data_devolucao' => Carbon::tomorrow()->toDateString(),
+        ])->assertSessionHasErrors('livro_id');
+    }
+
     public function test_book_status_can_be_changed_and_only_valid_active_books_can_be_rented(): void
     {
-        $operator = User::factory()->create();
-        $reader = User::factory()->create();
+        $operator = User::factory()->librarian()->create();
+        $reader = User::factory()->reader()->create();
         [$autor, $categoria, $livro] = $this->catalogo(['quantidade_total' => 2, 'quantidade_disponivel' => 2]);
         $payload = [
             'titulo' => $livro->titulo,
@@ -173,47 +204,47 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_catalog_filters_and_counts_are_applied_and_kept_in_pagination_links(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->librarian()->create();
         [$autor, $categoria, $livroDisponivel] = $this->catalogo([
             'titulo' => 'Clean Code',
             'isbn' => '9780132350884',
             'quantidade_total' => 2,
             'quantidade_disponivel' => 2,
         ]);
-        $livroIndisponivel = Livro::create([
+        [, , $livroIndisponivel] = PhysicalCatalog::book([
             'titulo' => 'Domain-Driven Design',
             'autor_id' => $autor->id,
             'categoria_id' => $categoria->id,
             'quantidade_total' => 1,
             'quantidade_disponivel' => 0,
             'status' => 'ativo',
-        ]);
-        $livroInativoComSaldo = Livro::create([
+        ], author: $autor, category: $categoria);
+        [, , $livroInativoComSaldo] = PhysicalCatalog::book([
             'titulo' => 'Livro Inativo Com Saldo',
             'autor_id' => $autor->id,
             'categoria_id' => $categoria->id,
             'quantidade_total' => 2,
             'quantidade_disponivel' => 2,
             'status' => 'inativo',
-        ]);
+        ], author: $autor, category: $categoria);
         $outraCategoria = Categoria::create(['nome' => 'História']);
-        Livro::create([
+        PhysicalCatalog::book([
             'titulo' => 'Outro Título',
             'autor_id' => $autor->id,
             'categoria_id' => $outraCategoria->id,
             'quantidade_total' => 1,
             'quantidade_disponivel' => 1,
             'status' => 'ativo',
-        ]);
+        ], author: $autor, category: $outraCategoria);
         foreach (range(1, 10) as $numero) {
-            Livro::create([
+            PhysicalCatalog::book([
                 'titulo' => "Clean {$numero}",
                 'autor_id' => $autor->id,
                 'categoria_id' => $categoria->id,
                 'quantidade_total' => 1,
                 'quantidade_disponivel' => 1,
                 'status' => 'ativo',
-            ]);
+            ], author: $autor, category: $categoria);
         }
 
         $response = $this->actingAs($user)->get(route('livros.index', [
@@ -261,13 +292,17 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_rental_filters_treat_active_as_all_open_and_calculate_overdue_by_due_date(): void
     {
-        $user = User::factory()->create(['name' => 'Maria Leitora']);
-        [, , $livro] = $this->catalogo(['titulo' => 'Livro Atrasado']);
-        $atrasada = $this->locacao($user, $livro, [
+        $user = User::factory()->librarian()->create(['name' => 'Maria Leitora']);
+        [, , $livro] = $this->catalogo([
+            'titulo' => 'Livro Atrasado',
+            'quantidade_total' => 2,
+            'quantidade_disponivel' => 2,
+        ]);
+        $atrasada = $this->locacao(User::factory()->reader()->create(), $livro, [
             'status' => 'ativa',
             'data_devolucao' => Carbon::yesterday()->toDateString(),
         ]);
-        $devolvida = $this->locacao(User::factory()->create(), $livro, [
+        $devolvida = $this->locacao(User::factory()->reader()->create(), $livro, [
             'status' => 'devolvida',
             'data_devolucao' => Carbon::tomorrow()->toDateString(),
             'data_devolvido' => Carbon::today()->toDateString(),
@@ -283,8 +318,8 @@ class BibliotecaManagementTest extends TestCase
 
     public function test_only_active_available_books_can_be_rented_and_open_rentals_cannot_be_duplicated(): void
     {
-        $operator = User::factory()->create();
-        $reader = User::factory()->create();
+        $operator = User::factory()->librarian()->create();
+        $reader = User::factory()->reader()->create();
         [, , $livro] = $this->catalogo(['quantidade_total' => 2, 'quantidade_disponivel' => 2]);
 
         $payload = [
@@ -312,23 +347,39 @@ class BibliotecaManagementTest extends TestCase
         $this->actingAs($operator)->post(route('locacoes.store'), $payload)
             ->assertSessionHasErrors('usuario_id');
 
-        $livroInativo = Livro::create([
+        [, , $livroInativo] = PhysicalCatalog::book([
             'titulo' => 'Indisponível',
             'autor_id' => $livro->autor_id,
             'categoria_id' => $livro->categoria_id,
             'quantidade_total' => 1,
             'quantidade_disponivel' => 1,
             'status' => 'inativo',
-        ]);
+        ], author: $livro->autor, category: $livro->categoria);
         $this->actingAs($operator)->post(route('locacoes.store'), [...$payload, 'livro_id' => $livroInativo->id])
             ->assertSessionHasErrors('livro_id');
     }
 
     public function test_return_is_idempotent_and_does_not_increase_stock_twice(): void
     {
-        $operator = User::factory()->create();
-        [, , $livro] = $this->catalogo(['quantidade_total' => 1, 'quantidade_disponivel' => 0]);
-        $locacao = $this->locacao(User::factory()->create(), $livro);
+        $operator = User::factory()->librarian()->create();
+        $autor = Autor::create(['nome' => 'Autor legado', 'nacionalidade' => 'Brasileira']);
+        $categoria = Categoria::create(['nome' => 'Acervo legado']);
+        $livro = Livro::create([
+            'titulo' => 'Empréstimo anterior à reconciliação',
+            'autor_id' => $autor->id,
+            'categoria_id' => $categoria->id,
+            'quantidade_total' => 1,
+            'quantidade_disponivel' => 0,
+            'status' => 'ativo',
+            'modo_acervo' => 'reconciliacao',
+        ]);
+        $locacao = Locacao::create([
+            'usuario_id' => User::factory()->reader()->create()->id,
+            'livro_id' => $livro->id,
+            'data_locacao' => Carbon::today()->toDateString(),
+            'data_devolucao' => Carbon::tomorrow()->toDateString(),
+            'status' => 'ativa',
+        ]);
 
         $this->actingAs($operator)->post(route('locacoes.devolver', $locacao))
             ->assertRedirect(route('locacoes.index'))
@@ -338,22 +389,22 @@ class BibliotecaManagementTest extends TestCase
 
         $this->actingAs($operator)->post(route('locacoes.devolver', $locacao))
             ->assertRedirect(route('locacoes.index'))
-            ->assertSessionHas('error', 'Este empréstimo já foi devolvido.');
+            ->assertSessionHas('error', 'Este empréstimo já foi encerrado.');
         $this->assertDatabaseHas('livros', ['id' => $livro->id, 'quantidade_disponivel' => 1]);
     }
 
     public function test_catalog_entities_with_dependencies_cannot_be_deleted_and_rental_deletion_route_does_not_exist(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->librarian()->create();
         [$autor, $categoria, $livro] = $this->catalogo();
-        $this->locacao(User::factory()->create(), $livro);
+        $this->locacao(User::factory()->reader()->create(), $livro);
 
         $this->actingAs($user)->delete(route('autores.destroy', $autor))
             ->assertSessionHas('error', 'Não é possível remover um autor que possui livros cadastrados.');
         $this->actingAs($user)->delete(route('categorias.destroy', $categoria))
             ->assertSessionHas('error', 'Não é possível remover uma categoria que possui livros cadastrados.');
         $this->actingAs($user)->delete(route('livros.destroy', $livro))
-            ->assertSessionHas('error', 'Não é possível remover um livro que possui histórico de empréstimos.');
+            ->assertSessionHas('error', 'Não é possível remover um livro que possui histórico de empréstimos ou exemplares. Inative o cadastro.');
 
         $this->assertDatabaseHas('autores', ['id' => $autor->id]);
         $this->assertDatabaseHas('categorias', ['id' => $categoria->id]);
@@ -361,12 +412,12 @@ class BibliotecaManagementTest extends TestCase
         $this->assertFalse(Route::has('locacoes.destroy'));
     }
 
-    public function test_book_stock_cannot_be_reduced_below_open_rentals_and_is_recalculated_after_update(): void
+    public function test_physical_book_quantity_cannot_be_changed_after_reconciliation(): void
     {
-        $operator = User::factory()->create();
-        [$autor, $categoria, $livro] = $this->catalogo(['quantidade_total' => 3, 'quantidade_disponivel' => 1]);
-        $this->locacao(User::factory()->create(), $livro);
-        $this->locacao(User::factory()->create(), $livro, ['status' => 'atrasada']);
+        $operator = User::factory()->librarian()->create();
+        [$autor, $categoria, $livro] = $this->catalogo(['quantidade_total' => 3, 'quantidade_disponivel' => 3]);
+        $this->locacao(User::factory()->reader()->create(), $livro);
+        $this->locacao(User::factory()->reader()->create(), $livro, ['status' => 'atrasada']);
 
         $payload = [
             'titulo' => $livro->titulo,
@@ -380,20 +431,16 @@ class BibliotecaManagementTest extends TestCase
             ->assertSessionHasErrors('quantidade_total');
         $this->assertDatabaseHas('livros', ['id' => $livro->id, 'quantidade_total' => 3, 'quantidade_disponivel' => 1]);
 
-        $this->actingAs($operator)->put(route('livros.update', $livro), [...$payload, 'quantidade_total' => 2])
-            ->assertRedirect(route('livros.index'));
-        $this->assertDatabaseHas('livros', ['id' => $livro->id, 'quantidade_total' => 2, 'quantidade_disponivel' => 0]);
+        $this->actingAs($operator)->put(route('livros.update', $livro), [...$payload, 'quantidade_total' => 4])
+            ->assertSessionHasErrors('quantidade_total');
+        $this->assertDatabaseHas('livros', ['id' => $livro->id, 'quantidade_total' => 3, 'quantidade_disponivel' => 1]);
     }
 
     /** @return array{Autor, Categoria, Livro} */
     private function catalogo(array $livroAttributes = []): array
     {
-        $autor = Autor::create(['nome' => 'Autor Exemplo', 'nacionalidade' => 'Brasileira']);
-        $categoria = Categoria::create(['nome' => 'Tecnologia']);
-        $livro = Livro::create(array_merge([
+        [$autor, $categoria, $livro] = PhysicalCatalog::book(array_merge([
             'titulo' => 'Livro Exemplo',
-            'autor_id' => $autor->id,
-            'categoria_id' => $categoria->id,
             'quantidade_total' => 3,
             'quantidade_disponivel' => 3,
             'status' => 'ativo',
@@ -404,9 +451,7 @@ class BibliotecaManagementTest extends TestCase
 
     private function locacao(User $user, Livro $livro, array $attributes = []): Locacao
     {
-        return Locacao::create(array_merge([
-            'usuario_id' => $user->id,
-            'livro_id' => $livro->id,
+        return PhysicalCatalog::loan($user, $livro, array_merge([
             'data_locacao' => Carbon::today()->toDateString(),
             'data_devolucao' => Carbon::tomorrow()->toDateString(),
             'status' => 'ativa',

@@ -1,0 +1,110 @@
+{
+  "date": "2026-09-25",
+  "scope": "Local development server; not production capacity",
+  "host_cpu": "Intel Core i7-7700HQ, 4 cores / 8 threads",
+  "docker_resources": {
+    "cpus": 8,
+    "memory_bytes": 8258809856
+  },
+  "dataset": {
+    "books": 5000,
+    "copies": 15000,
+    "readers": 200,
+    "closed_loans": 20000
+  },
+  "image_id": "sha256:93a684f75778f20088951d3e6256d4bf396a91d1e47964acc1b95913ea48814c",
+  "target": {
+    "p95_ms_max": 281.86,
+    "errors": 0,
+    "basis": "20% below the uncached baseline on this local workload"
+  },
+  "target_met": false,
+  "p95_improvement_percent": 14.73,
+  "query_metrics": [
+    {
+      "mode": "uncached",
+      "queries": 5,
+      "sql_ms": 26.479999999999997,
+      "total_ms": 43.63894462585449,
+      "total_results": 5000
+    },
+    {
+      "mode": "cold",
+      "queries": 6,
+      "sql_ms": 19.32,
+      "total_ms": 28.892040252685547,
+      "total_results": 5000
+    },
+    {
+      "mode": "warm",
+      "queries": 1,
+      "sql_ms": 0.86,
+      "total_ms": 2.2950172424316406,
+      "total_results": 5000
+    }
+  ],
+  "scenarios": [
+    {
+      "cache_enabled": false,
+      "http": {
+        "requests": 200,
+        "concurrency": 4,
+        "paths": [
+          "/catalogo",
+          "/catalogo?q=Acervo",
+          "/catalogo?categoria=5",
+          "/catalogo?page=10"
+        ],
+        "p50_ms": 272.4,
+        "p95_ms": 352.33,
+        "max_ms": 400.54230000000007,
+        "errors": 0,
+        "elapsed_seconds": 14.0594002,
+        "requests_per_second": 14.225357921029945
+      },
+      "resource_samples": [
+        {
+          "cpu_percent": "0.45%",
+          "memory": "69.45MiB / 7.692GiB",
+          "memory_percent": "0.88%"
+        },
+        {
+          "cpu_percent": "0.02%",
+          "memory": "69.76MiB / 7.692GiB",
+          "memory_percent": "0.89%"
+        }
+      ]
+    },
+    {
+      "cache_enabled": true,
+      "http": {
+        "requests": 200,
+        "concurrency": 4,
+        "paths": [
+          "/catalogo",
+          "/catalogo?q=Acervo",
+          "/catalogo?categoria=5",
+          "/catalogo?page=10"
+        ],
+        "p50_ms": 232.13,
+        "p95_ms": 300.44,
+        "max_ms": 388.43759999999975,
+        "errors": 0,
+        "elapsed_seconds": 11.842192200000001,
+        "requests_per_second": 16.888764902836147
+      },
+      "resource_samples": [
+        {
+          "cpu_percent": "0.52%",
+          "memory": "69.45MiB / 7.692GiB",
+          "memory_percent": "0.88%"
+        },
+        {
+          "cpu_percent": "0.02%",
+          "memory": "70.07MiB / 7.692GiB",
+          "memory_percent": "0.89%"
+        }
+      ]
+    }
+  ]
+}

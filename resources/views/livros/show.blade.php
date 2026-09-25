@@ -4,7 +4,7 @@
 
 @section('content')
     @php($disponivel = $livro->quantidade_disponivel > 0)
-    @php($podeEmprestar = $livro->status === 'ativo' && $disponivel)
+    @php($podeEmprestar = $livro->usaExemplares() && $livro->status === 'ativo' && $disponivel)
     <a href="{{ route('livros.index') }}" class="back-link">← Voltar ao acervo</a>
     <header class="page-heading">
         <div>
@@ -13,6 +13,8 @@
             <p>{{ $livro->autor->nome ?? 'Autor não informado' }} · {{ $livro->categoria->nome ?? 'Sem categoria' }}</p>
         </div>
         <div class="page-actions">
+            <a class="btn btn-secondary" href="{{ route('exemplares.index', $livro) }}">Exemplares</a>
+            @if(!$livro->usaExemplares())<a class="btn btn-primary" href="{{ route('livros.reconciliacao.edit', $livro) }}">Conferir inventário</a>@endif
             @if($podeEmprestar)
                 <a href="{{ route('locacoes.create', ['livro_id' => $livro->id]) }}" class="btn btn-primary">Registrar empréstimo</a>
             @elseif($livro->status !== 'ativo')
@@ -42,7 +44,7 @@
                 <h2>Histórico de empréstimos</h2>
             </div>
         </div>
-        @if($livro->locacoes->isEmpty())
+        @if($locacoes->isEmpty())
             <div class="empty-state">
                 <h2>Este livro ainda não foi emprestado</h2>
                 <p>O histórico de circulação aparecerá aqui após o primeiro empréstimo.</p>
@@ -53,7 +55,7 @@
                 <table class="data-table">
                     <thead><tr><th scope="col">Pessoa</th><th scope="col">Retirada</th><th scope="col">Previsão de devolução</th><th scope="col">Situação</th></tr></thead>
                     <tbody>
-                        @foreach($livro->locacoes as $locacao)
+                        @foreach($locacoes as $locacao)
                             <tr>
                                 <td><a href="{{ route('locacoes.show', $locacao) }}" class="text-link">{{ $locacao->usuario->name ?? 'Usuário removido' }}</a></td>
                                 <td>{{ \Illuminate\Support\Carbon::parse($locacao->data_locacao)->format('d/m/Y') }}</td>
@@ -65,6 +67,7 @@
                     </tbody>
                 </table>
             </div>
+            {{ $locacoes->links() }}
         @endif
     </section>
 @endsection

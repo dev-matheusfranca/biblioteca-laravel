@@ -10,6 +10,7 @@
             <h1>Cadastrar livro</h1>
             <p>Inclua os dados do título e a quantidade inicial de exemplares.</p>
         </div>
+        <a href="{{ route('isbn.index') }}" class="btn btn-secondary">Consultar ISBN</a>
     </header>
 
     <section class="panel form-panel">

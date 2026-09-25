@@ -5,7 +5,7 @@
     <section class="auth-intro">
         <span class="eyebrow">UM ESPAÇO PARA COMPARTILHAR</span>
         <h1>Boas histórias<br>começam aqui.</h1>
-        <p>Crie sua conta para acessar a biblioteca e participar da organização do acervo.</p>
+        <p>Crie sua conta para consultar o catálogo e acompanhar seus próprios empréstimos.</p>
         <div class="auth-benefits">
             <div class="auth-benefit">@include('partials.icon', ['name' => 'book']) Livros, autores e categorias organizados</div>
             <div class="auth-benefit">@include('partials.icon', ['name' => 'arrows']) Um histórico para cada leitura</div>
@@ -29,13 +29,13 @@
             </div>
             <div class="field">
                 <label for="password">Senha</label>
-                <input id="password" type="password" name="password" class="form-control" autocomplete="new-password" minlength="6" required aria-describedby="password-hint @error('password') password-error @enderror" @error('password') aria-invalid="true" @enderror>
-                <p class="password-hint" id="password-hint">Use pelo menos 6 caracteres.</p>
+                <input id="password" type="password" name="password" class="form-control" autocomplete="new-password" minlength="8" required aria-describedby="password-hint @error('password') password-error @enderror" @error('password') aria-invalid="true" @enderror>
+                <p class="password-hint" id="password-hint">Use pelo menos 8 caracteres.</p>
                 @error('password')<span id="password-error" class="field-error">{{ $message }}</span>@enderror
             </div>
             <div class="field">
                 <label for="password_confirmation">Confirmar senha</label>
-                <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" autocomplete="new-password" minlength="6" required>
+                <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" autocomplete="new-password" minlength="8" required>
             </div>
             <button class="btn btn-primary" type="submit">Criar conta @include('partials.icon', ['name' => 'arrow'])</button>
         </form>

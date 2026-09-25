@@ -5,7 +5,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "vendor:sync": "node scripts/sync-form-vendors.mjs"
+        "vendor:sync": "node scripts/sync-form-vendors.mjs",
+        "assets:check": "node scripts/check-assets.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

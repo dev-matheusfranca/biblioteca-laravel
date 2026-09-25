@@ -144,6 +144,16 @@ return [
 
     'redis' => [
 
+        'catalog' => [
+            'host' => env('REDIS_CATALOG_HOST', '127.0.0.1'),
+            'port' => env('REDIS_CATALOG_PORT', '6379'),
+            'password' => env('REDIS_CATALOG_PASSWORD'),
+            'database' => 0,
+            'timeout' => 0.5,
+            'read_timeout' => 0.5,
+            'max_retries' => 0,
+        ],
+
         'client' => env('REDIS_CLIENT', 'phpredis'),
 
         'options' => [

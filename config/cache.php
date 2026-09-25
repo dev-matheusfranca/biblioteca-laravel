@@ -34,6 +34,12 @@ return [
 
     'stores' => [
 
+        'catalog' => [
+            'driver' => 'redis',
+            'connection' => 'catalog',
+            'lock_connection' => 'catalog',
+        ],
+
         'array' => [
             'driver' => 'array',
             'serialize' => false,

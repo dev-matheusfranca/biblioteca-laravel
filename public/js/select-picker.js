@@ -1,7 +1,7 @@
 (() => {
     if (typeof window.TomSelect !== "function") return;
 
-    document.querySelectorAll("select.form-control:not([multiple])").forEach((select) => {
+    document.querySelectorAll("select.form-control:not([multiple]):not([data-native-select])").forEach((select) => {
         if (select.tomselect) return;
 
         const picker = new window.TomSelect(select, {
